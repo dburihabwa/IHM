@@ -2,6 +2,7 @@ package fr.lille1.ihm.burihabwa;
 
 import java.awt.Color;
 import java.awt.Font;
+import java.awt.Paint;
 
 import javax.swing.JFrame;
 
@@ -11,11 +12,14 @@ import fr.lri.swingstates.canvas.CShape;
 import fr.lri.swingstates.canvas.CStateMachine;
 import fr.lri.swingstates.canvas.CText;
 import fr.lri.swingstates.canvas.Canvas;
-import fr.lri.swingstates.canvas.transitions.ClickOnShape;
 import fr.lri.swingstates.canvas.transitions.EnterOnShape;
 import fr.lri.swingstates.canvas.transitions.LeaveOnShape;
+import fr.lri.swingstates.canvas.transitions.PressOnShape;
+import fr.lri.swingstates.canvas.transitions.ReleaseOnShape;
 import fr.lri.swingstates.sm.State;
 import fr.lri.swingstates.sm.Transition;
+import fr.lri.swingstates.sm.transitions.Release;
+import fr.lri.swingstates.sm.transitions.TimeOut;
 
 /**
  * @author Nicolas Roussel (roussel@lri.fr)
@@ -30,11 +34,11 @@ public class SimpleButton {
 
 	SimpleButton(final Canvas canvas, final String text) {
 		int x = 0, y = 0;
-		rectangle = canvas.newRectangle(50, 50, 100, 100);
+		rectangle = canvas.newRectangle(100, 100, 100, 100);
 		label = canvas.newText(x, y, text, new Font("verdana", Font.PLAIN, 12));
 		rectangle.translateTo(label.getCenterX(), label.getCenterY());
 		rectangle.setParent(label);
-		final CExtensionalTag tag = new CExtensionalTag(canvas) {
+		final CExtensionalTag boxTag = new CExtensionalTag(canvas) {
 			public void added(CShape shape) {
 				shape.setOutlined(true);
 			}
@@ -43,59 +47,96 @@ public class SimpleButton {
 				shape.setOutlined(false);
 			}
 		};
+		final CExtensionalTag colorTag = new CExtensionalTag(canvas) {
+			Paint initColor = null;
+			Paint actColor = Color.YELLOW;
+
+			@Override
+			public void added(CShape shape) {
+				super.added(shape);
+				if (initColor == null) {
+					initColor = shape.getFillPaint();
+				}
+				shape.setFillPaint(actColor);
+			}
+
+			@Override
+			public void removed(CShape shape) {
+				super.removed(shape);
+				shape.setFillPaint(initColor);
+			}
+		};
+
 		stateMachine = new CStateMachine() {
-			State state;
 			public State idle = new State() {
-				Transition enterOnShape = new EnterOnShape(">> hover") {
+				Transition enterOnShape = new EnterOnShape(">> over") {
 					@Override
 					public void action() {
-//						super.action();
-//						state = hover;
-						getShape().addTag(tag);
-						System.out.println("Entered the shape!");
+						super.action();
+						getShape().addTag(boxTag);
 					}
 				};
 			};
-			public State hover = new State() {
+			public State over = new State() {
 				Transition onLeaveShape = new LeaveOnShape(">> idle") {
 					@Override
 					public void action() {
-//						super.action();
-//						state = idle;
-						getShape().removeTag(tag);
-						System.out.println("Left the shape!");
+						super.action();
+						getShape().removeTag(boxTag);
 					}
 				};
-				Transition onClickShape = new ClickOnShape(">> clicked") {
+				Transition onPressShape = new PressOnShape(">> activated") {
 					@Override
 					public void action() {
-						// TODO Auto-generated method stub
 						super.action();
-						getShape().setFillPaint(Color.YELLOW);
-						System.out.println("Clicked on the button!");
+						getShape().addTag(colorTag);
 					}
-					
-				};
 
+				};
 			};
-			public State clicked = new State() {
-				Transition onClickShape = new ClickOnShape(">> clicked") {
+			public State activated = new State() {
+				Transition onLeaveShape = new LeaveOnShape(">> deactivated") {
 					@Override
 					public void action() {
-						// TODO Auto-generated method stub
 						super.action();
-						getShape().setFillPaint(Color.YELLOW);
-						System.out.println("Clicked on the button!");
+						getShape().removeTag(colorTag);
+						getShape().removeTag(boxTag);
 					}
-					
+				};
+				Transition onReleaseShape = new ReleaseOnShape(">> over") {
+					@Override
+					public void action() {
+						super.action();
+						getShape().removeTag(colorTag);
+					}
+				};
+				Transition timeout = new TimeOut(">> activated") {
+					@Override
+					public void action() {
+						super.action();
+						System.out.println("DEMI-CLICK!");
+					}
+				};
+			};
+			public State deactivated = new State() {
+
+				Transition onReleaseShape = new Release(">> idle") {
+					@Override
+					public void action() {
+						super.action();
+						getShape().removeTag(boxTag);
+					}
+				};
+				Transition onEnterShape = new EnterOnShape(">> activated") {
+					@Override
+					public void action() {
+						super.action();
+						getShape().addTag(colorTag);
+					}
 				};
 			};
 		};
-		stateMachine.attachTo(canvas);
-	}
-
-	public void action() {
-		System.out.println("ACTION!");
+		stateMachine.attachTo(rectangle);
 	}
 
 	public CShape getShape() {
@@ -110,14 +151,14 @@ public class SimpleButton {
 		JFrame frame = new JFrame();
 		frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 		Canvas canvas = new Canvas(400, 400);
-		SimpleButton simpleButton = new SimpleButton(canvas, "PLOP");
+		new SimpleButton(canvas, "simple");
 		frame.getContentPane().add(canvas);
 		frame.setTitle("Première machine à états sur un canevas");
 		frame.setVisible(true);
-		
-//		StateMachineVisualization smv = new StateMachineVisualization(
-//				simpleButton.stateMachine);
-//		frame.add(smv);
+
+		// StateMachineVisualization smv = new StateMachineVisualization(
+		// simpleButton.stateMachine);
+		// frame.add(smv);
 
 		frame.pack();
 	}
